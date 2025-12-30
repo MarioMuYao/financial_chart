@@ -672,10 +672,15 @@ class GChartInteractionHandler with Diagnosticable {
           pointViewPort.endPoint - distance,
         );
         // make sure do not scroll too far that it goes out of current data point range
+        double spacingPoints = pointViewPort.pointRangeSize;
+        final autoScaleStrategy = pointViewPort.autoScaleStrategy;
+        if (autoScaleStrategy is GPointViewPortAutoScaleStrategyLatest) {
+          spacingPoints = autoScaleStrategy.endSpacingPoints.toDouble();
+        }
         final startMin =
-            _chart.dataSource.firstPoint - pointViewPort.pointRangeSize / 2;
+            _chart.dataSource.firstPoint - spacingPoints;
         final endMax =
-            _chart.dataSource.lastPoint + pointViewPort.pointRangeSize / 2;
+            _chart.dataSource.lastPoint + spacingPoints;
         newRange = pointViewPort.clampRange(
           newRange.first!,
           newRange.last!,
