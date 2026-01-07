@@ -21,6 +21,8 @@ class GPointViewPort extends ChangeNotifier with Diagnosticable {
   ///
   /// This value is mainly used for auto scaling. see [GPointViewPortAutoScaleStrategyLatest].
   final double defaultPointWidth;
+  
+  final double? spacing;
 
   /// Current point range (left and right) of the viewport.
   final GRange _pointRange = GRange.empty();
@@ -142,6 +144,7 @@ class GPointViewPort extends ChangeNotifier with Diagnosticable {
     this.minPointWidth = 2,
     this.maxPointWidth = 100,
     this.defaultPointWidth = 10,
+    this.spacing,
     double startPointMin = double.negativeInfinity,
     double endPointMax = double.infinity,
   }) {
