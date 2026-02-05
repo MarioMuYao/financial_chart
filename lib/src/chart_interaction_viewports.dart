@@ -129,7 +129,7 @@ class GValueViewPortInteractionHelper {
     double zoomRatio, {
     bool notify = true,
   }) {
-    if (!isScaling) {
+    if (_valueViewPort == null || !isScaling) {
       return;
     }
     _valueViewPort!.zoom(
@@ -143,7 +143,7 @@ class GValueViewPortInteractionHelper {
   }
 
   void interactionMoveUpdate(Rect area, double movedDistance) {
-    if (!isScaling) {
+    if (_valueViewPort == null || !isScaling) {
       return;
     }
     if (_valueViewPort!.scaleType == GValueViewPortScaleType.linear) {
@@ -181,7 +181,7 @@ class GValueViewPortInteractionHelper {
     double position, {
     bool finished = false,
   }) {
-    if (!isScaling) {
+    if (_valueViewPort == null || !isScaling) {
       return;
     }
     final value1 = _valueViewPort!.positionToValue(
