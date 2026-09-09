@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:math';
 
 import 'package:flutter/animation.dart';
@@ -101,6 +102,8 @@ class GValueViewPort extends ChangeNotifier with Diagnosticable {
   Animation<double>? _rangeAnimation;
   final GRange _animationStartRange = GRange.empty();
   final GRange _animationTargetRange = GRange.empty();
+  Timer? _rangeAnimationStartTimer;
+  int _animationGeneration = 0;
   bool get isAnimating => _animationStartRange.isNotEmpty;
 
   /// Create a value viewport.
@@ -175,6 +178,9 @@ class GValueViewPort extends ChangeNotifier with Diagnosticable {
     if (_disposed) {
       return;
     }
+    _animationGeneration++;
+    _rangeAnimationStartTimer?.cancel();
+    _rangeAnimationStartTimer = null;
     _rangeAnimationController?.stop();
     _animationStartRange.clear();
     _animationTargetRange.clear();
@@ -225,12 +231,32 @@ class GValueViewPort extends ChangeNotifier with Diagnosticable {
     _animationStartRange.update(startValue, endValue);
     _animationTargetRange.copy(targetRange);
 
-    Future.delayed(const Duration(milliseconds: 10), () {
-      _rangeAnimationController!.reset();
-      _rangeAnimationController!.forward().then((_) {
-        stopAnimation();
-        onFinished?.call();
-      }, onError: (_, _) => stopAnimation());
+    final animationGeneration = _animationGeneration;
+    final animationController = _rangeAnimationController!;
+
+    _rangeAnimationStartTimer = Timer(const Duration(milliseconds: 10), () {
+      _rangeAnimationStartTimer = null;
+      if (_disposed ||
+          animationGeneration != _animationGeneration ||
+          !identical(_rangeAnimationController, animationController)) {
+        return;
+      }
+      animationController.reset();
+      animationController.forward().then(
+        (_) {
+          if (_disposed || animationGeneration != _animationGeneration) {
+            return;
+          }
+          stopAnimation();
+          onFinished?.call();
+        },
+        onError: (_, _) {
+          if (_disposed || animationGeneration != _animationGeneration) {
+            return;
+          }
+          stopAnimation();
+        },
+      );
     });
   }
 
@@ -494,11 +520,20 @@ class GValueViewPort extends ChangeNotifier with Diagnosticable {
 
   @override
   void dispose() {
+    if (_disposed) {
+      return;
+    }
+    _disposed = true;
+    _animationGeneration++;
+    _rangeAnimationStartTimer?.cancel();
+    _rangeAnimationStartTimer = null;
     _rangeAnimation?.removeListener(_rangeAnimationListener);
-    _rangeAnimationController
+    _rangeAnimation = null;
+    final animationController = _rangeAnimationController;
+    _rangeAnimationController = null;
+    animationController
       ?..stop()
       ..dispose();
-    _disposed = true;
     super.dispose();
   }
 

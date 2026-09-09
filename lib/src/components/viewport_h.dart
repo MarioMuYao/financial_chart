@@ -1,4 +1,6 @@
+import 'dart:async';
 import 'dart:math';
+
 import 'package:flutter/animation.dart';
 import 'package:flutter/foundation.dart';
 
@@ -21,7 +23,7 @@ class GPointViewPort extends ChangeNotifier with Diagnosticable {
   ///
   /// This value is mainly used for auto scaling. see [GPointViewPortAutoScaleStrategyLatest].
   final double defaultPointWidth;
-  
+
   final double? spacing;
 
   /// Current point range (left and right) of the viewport.
@@ -133,6 +135,8 @@ class GPointViewPort extends ChangeNotifier with Diagnosticable {
   Animation<double>? _rangeAnimation;
   final GRange _animationStartRange = GRange.empty();
   final GRange _animationTargetRange = GRange.empty();
+  Timer? _rangeAnimationStartTimer;
+  int _animationGeneration = 0;
   bool get isAnimating => _animationStartRange.isNotEmpty;
 
   GPointViewPort({
@@ -207,6 +211,9 @@ class GPointViewPort extends ChangeNotifier with Diagnosticable {
     if (_disposed) {
       return;
     }
+    _animationGeneration++;
+    _rangeAnimationStartTimer?.cancel();
+    _rangeAnimationStartTimer = null;
     _rangeAnimationController?.stop();
     _animationStartRange.clear();
     _animationTargetRange.clear();
@@ -259,18 +266,50 @@ class GPointViewPort extends ChangeNotifier with Diagnosticable {
     final clampedRange = clampRange(targetRange.first!, targetRange.last!);
     _animationStartRange.update(startPoint, endPoint);
     _animationTargetRange.copy(clampedRange);
-    Future.delayed(const Duration(milliseconds: 1), () {
-      _rangeAnimationController!.reset();
+    final animationGeneration = _animationGeneration;
+    final animationController = _rangeAnimationController!;
+    _rangeAnimationStartTimer = Timer(const Duration(milliseconds: 1), () {
+      _rangeAnimationStartTimer = null;
+      if (_disposed ||
+          animationGeneration != _animationGeneration ||
+          !identical(_rangeAnimationController, animationController)) {
+        return;
+      }
+      animationController.reset();
       if (simulation != null) {
-        _rangeAnimationController!.animateWith(simulation).then((_) {
-          stopAnimation();
-          _notify(finished: true);
-        }, onError: (_, _) => stopAnimation());
+        animationController
+            .animateWith(simulation)
+            .then(
+              (_) {
+                if (_disposed || animationGeneration != _animationGeneration) {
+                  return;
+                }
+                stopAnimation();
+                _notify(finished: true);
+              },
+              onError: (_, _) {
+                if (_disposed || animationGeneration != _animationGeneration) {
+                  return;
+                }
+                stopAnimation();
+              },
+            );
       } else {
-        _rangeAnimationController!.forward().then((_) {
-          stopAnimation();
-          _notify(finished: true);
-        }, onError: (_, _) => stopAnimation());
+        animationController.forward().then(
+          (_) {
+            if (_disposed || animationGeneration != _animationGeneration) {
+              return;
+            }
+            stopAnimation();
+            _notify(finished: true);
+          },
+          onError: (_, _) {
+            if (_disposed || animationGeneration != _animationGeneration) {
+              return;
+            }
+            stopAnimation();
+          },
+        );
       }
     });
   }
@@ -507,11 +546,20 @@ class GPointViewPort extends ChangeNotifier with Diagnosticable {
 
   @override
   void dispose() {
+    if (_disposed) {
+      return;
+    }
+    _disposed = true;
+    _animationGeneration++;
+    _rangeAnimationStartTimer?.cancel();
+    _rangeAnimationStartTimer = null;
     _rangeAnimation?.removeListener(_rangeAnimationListener);
-    _rangeAnimationController
+    _rangeAnimation = null;
+    final animationController = _rangeAnimationController;
+    _rangeAnimationController = null;
+    animationController
       ?..stop()
       ..dispose();
-    _disposed = true;
     super.dispose();
   }
 
